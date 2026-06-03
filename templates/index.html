@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>服务器监控系统</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'Segoe UI',sans-serif;background:#0f1117;color:#e0e0e0;min-height:100vh;}
+.header{background:linear-gradient(135deg,#1a1f2e,#2d3561);padding:16px 30px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #2a2f45;box-shadow:0 2px 20px rgba(0,0,0,0.5);}
+.header h1{font-size:20px;color:#fff;display:flex;align-items:center;gap:10px;}
+.header h1 span{color:#4f9eff;}
+.nav a{color:#aaa;text-decoration:none;margin-left:20px;font-size:14px;transition:color .2s;}
+.nav a:hover,.nav a.active{color:#4f9eff;}
+.container{display:flex;gap:24px;padding:24px;max-width:1400px;margin:0 auto;}
+.left-panel{width:380px;flex-shrink:0;}
+.right-panel{flex:1;}
+.card{background:#1a1f2e;border:1px solid #2a2f45;border-radius:12px;padding:20px;margin-bottom:20px;}
+.card h3{font-size:14px;color:#888;margin-bottom:16px;display:flex;align-items:center;gap:8px;}
+.card h3::before{content:'';width:3px;height:14px;background:#4f9eff;border-radius:2px;display:inline-block;}
+.form-group{margin-bottom:14px;}
+.form-group label{display:block;font-size:12px;color:#888;margin-bottom:6px;}
+.form-group input,.form-group select{width:100%;background:#0f1117;border:1px solid #2a2f45;border-radius:8px;padding:10px 12px;color:#e0e0e0;font-size:13px;outline:none;transition:border .2s;}
+.form-group input:focus,.form-group select:focus{border-color:#4f9eff;}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.btn{width:100%;padding:12px;border:none;border-radius:8px;cursor:pointer;font-size:14px;font-weight:600;transition:all .2s;}
+.btn-primary{background:linear-gradient(135deg,#4f9eff,#2d6fd4);color:#fff;}
+.btn-primary:hover{transform:translateY(-1px);box-shadow:0 4px 15px rgba(79,158,255,0.4);}
+.btn-cancel{background:#2a2f45;color:#aaa;margin-top:8px;}
+.btn-cancel:hover{background:#353b54;}
+.host-table{width:100%;border-collapse:collapse;}
+.host-table th{text-align:left;padding:10px 12px;font-size:12px;color:#666;border-bottom:1px solid #2a2f45;}
+.host-table td{padding:12px;font-size:13px;border-bottom:1px solid #1e2338;}
+.host-table tr:hover td{background:#1e2338;}
+.badge{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:20px;font-size:12px;font-weight:600;}
+.badge-online{background:rgba(34,197,94,0.15);color:#22c55e;}
+.badge-offline{background:rgba(239,68,68,0.15);color:#ef4444;}
+.badge-init{background:rgba(234,179,8,0.15);color:#eab308;}
+.dot{width:6px;height:6px;border-radius:50%;background:currentColor;}
+.metric-bar{height:4px;background:#2a2f45;border-radius:2px;margin-top:4px;}
+.metric-fill{height:100%;border-radius:2px;transition:width .5s;}
+.fill-green{background:#22c55e;}
+.fill-yellow{background:#eab308;}
+.fill-red{background:#ef4444;}
+.action-btn{background:none;border:1px solid #2a2f45;color:#888;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:12px;margin-left:4px;transition:all .2s;}
+.action-btn:hover{border-color:#ef4444;color:#ef4444;}
+.action-btn.edit:hover{border-color:#4f9eff;color:#4f9eff;}
+.alert-item{padding:10px 14px;border-radius:8px;margin-bottom:8px;font-size:12px;border-left:3px solid;}
+.alert-red{background:rgba(239,68,68,0.08);border-color:#ef4444;color:#fca5a5;}
+.alert-yellow{background:rgba(234,179,8,0.08);border-color:#eab308;color:#fde68a;}
+.alert-green{background:rgba(34,197,94,0.08);border-color:#22c55e;color:#86efac;}
+.empty{text-align:center;color:#444;padding:30px;font-size:13px;}
+.form-title{font-size:13px;color:#4f9eff;margin-bottom:6px;}
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>🖥 服务器<span>监控系统</span></h1>
+  <nav class="nav">
+    <a href=" " class="active">主机管理</a >
+    <a href="/dashboard">监控大屏</a >
+  </nav>
+</div>
+<div class="container">
+  <div class="left-panel">
+    <div class="card">
+      <h3 id="form-mode">添加监控主机</h3>
+      <div class="form-group"><label>主机IP地址</label><input id="ip" placeholder="192.168.1.100"></div>
+      <div class="form-row">
+        <div class="form-group"><label>SSH端口</label><input id="port" value="22" type="number"></div>
+        <div class="form-group"><label>分组</label><input id="group" value="默认分组"></div>
+      </div>
+      <div class="form-group"><label>用户名</label><input id="username" placeholder="root"></div>
+      <div class="form-group"><label>密码 <span id="pwd-hint" style="color:#666"></span></label><input id="password" type="password"></div>
+      <div class="form-group"><label>备注</label><input id="desc" placeholder="可选描述"></div>
+      <div class="form-row">
+        <div class="form-group"><label>CPU告警(%)</label><input id="cpu_t" value="80" type="number"></div>
+        <div class="form-group"><label>内存告警(%)</label><input id="mem_t" value="85" type="number"></div>
+      </div>
+      <div class="form-group"><label>磁盘告警(%)</label><input id="disk_t" value="90" type="number"></div>
+      <button class="btn btn-primary" id="submit-btn" onclick="submitHost()">+ 添加主机</button>
+      <button class="btn btn-cancel" id="cancel-btn" onclick="cancelEdit()" style="display:none">取消编辑</button>
+    </div>
+  </div>
+  <div class="right-panel">
+    <div class="card">
+      <h3>主机列表 <span id="host-count" style="color:#4f9eff;margin-left:8px;"></span></h3>
+      <table class="host-table">
+        <thead><tr><th>状态</th><th>主机IP</th><th>备注</th><th>CPU</th><th>内存</th><th>磁盘</th><th>操作</th></tr></thead>
+        <tbody id="host-list"><tr><td colspan="7" class="empty">暂无主机数据</td></tr></tbody>
+      </table>
+    </div>
+    <div class="card">
+      <h3>活跃告警</h3>
+      <div id="alert-list"><div class="empty">暂无告警</div></div>
+    </div>
+    <div class="card">
+      <h3>主机状态变更</h3>
+      <div id="status-list"><div class="empty">暂无记录</div></div>
+    </div>
+  </div>
+</div>
+<script>
+let editingId=null;
+let hostsCache=[];
+function getColor(v,warn,danger){return v>danger?'fill-red':v>warn?'fill-yellow':'fill-green';}
+function bar(v){let c=getColor(v,60,80);return `<div class="metric-bar"><div class="metric-fill ${c}" style="width:${v||0}%"></div></div>`;}
+async function loadHosts(){
+  const r=await fetch('/api/hosts');const hosts=await r.json();
+  hostsCache=hosts;
+  const tb=document.getElementById('host-list');
+  document.getElementById('host-count').textContent=`共${hosts.length}台`;
+  if(!hosts.length){tb.innerHTML='<tr><td colspan="7" class="empty">暂无主机数据</td></tr>';return;}
+  tb.innerHTML=hosts.map(h=>{
+    const s=h.status==='online'?'badge-online':h.status==='offline'?'badge-offline':'badge-init';
+    const st=h.status==='online'?'在线':h.status==='offline'?'离线':'初始化';
+    return `<tr>
+      <td><span class="badge ${s}"><span class="dot"></span>${st}</span></td>
+      <td><strong>${h.ip}</strong><br><small style="color:#555">${h.group_name||''}</small></td>
+      <td style="color:#888">${h.description||'-'}</td>
+      <td>${h.cpu_usage!=null?h.cpu_usage.toFixed(1)+'%':'-'}${h.cpu_usage!=null?bar(h.cpu_usage):''}</td>
+      <td>${h.mem_usage!=null?h.mem_usage.toFixed(1)+'%':'-'}${h.mem_usage!=null?bar(h.mem_usage):''}</td>
+      <td>${h.disk_usage!=null?h.disk_usage.toFixed(1)+'%':'-'}${h.disk_usage!=null?bar(h.disk_usage):''}</td>
+      <td><button class="action-btn edit" onclick="startEdit(${h.id})">编辑</button><button class="action-btn" onclick="delHost(${h.id})">删除</button></td>
+    </tr>`;}).join('');
+}
+async function loadAlerts(){
+  const r=await fetch('/api/alerts');const alerts=await r.json();
+  const el=document.getElementById('alert-list');
+  if(!alerts.length){el.innerHTML='<div class="empty">暂无告警</div>';return;}
+  el.innerHTML=alerts.slice(0,5).map(a=>{
+    const t=a.alert_type==='cpu'?'CPU':a.alert_type==='memory'?'内存':'磁盘';
+    const diff=a.current_value-a.threshold;
+    const cls=diff>10?'alert-red':'alert-yellow';
+    return `<div class="alert-item ${cls}">${a.ip} · ${t}使用率 ${a.current_value.toFixed(1)}% 超过阈值 ${a.threshold}% <span style="float:right;color:#666">${a.created_at}</span></div>`;
+  }).join('');
+}
+async function loadChanges(){
+  const r=await fetch('/api/status_changes');const changes=await r.json();
+  const el=document.getElementById('status-list');
+  if(!changes.length){el.innerHTML='<div class="empty">暂无记录</div>';return;}
+  el.innerHTML=changes.slice(0,5).map(c=>{
+    const cls=c.new_status==='online'?'alert-green':c.new_status==='offline'?'alert-red':'alert-yellow';
+    const st=c.new_status==='online'?'上线':c.new_status==='offline'?'离线':'初始化';
+    return `<div class="alert-item ${cls}">${c.ip} 状态变为 <strong>${st}</strong> <span style="float:right;color:#666">${c.changed_at}</span></div>`;
+  }).join('');
+}
+function startEdit(id){
+  const h=hostsCache.find(x=>x.id===id);
+  if(!h)return;
+  editingId=id;
+  document.getElementById('ip').value=h.ip;
+  document.getElementById('ip').disabled=true;
+  document.getElementById('port').value=h.port;
+  document.getElementById('group').value=h.group_name||'默认分组';
+  document.getElementById('username').value=h.username;
+  document.getElementById('password').value='';
+  document.getElementById('desc').value=h.description||'';
+  document.getElementById('cpu_t').value=h.cpu_threshold;
+  document.getElementById('mem_t').value=h.mem_threshold;
+  document.getElementById('disk_t').value=h.disk_threshold;
+  document.getElementById('form-mode').textContent='编辑主机 '+h.ip;
+  document.getElementById('submit-btn').textContent='保存修改';
+  document.getElementById('cancel-btn').style.display='block';
+  document.getElementById('pwd-hint').textContent='(留空则不修改)';
+  window.scrollTo(0,0);
+}
+function cancelEdit(){
+  editingId=null;
+  document.getElementById('ip').disabled=false;
+  document.getElementById('ip').value='';
+  document.getElementById('port').value='22';
+  document.getElementById('group').value='默认分组';
+  document.getElementById('username').value='';
+  document.getElementById('password').value='';
+  document.getElementById('desc').value='';
+  document.getElementById('cpu_t').value='80';
+  document.getElementById('mem_t').value='85';
+  document.getElementById('disk_t').value='90';
+  document.getElementById('form-mode').textContent='添加监控主机';
+  document.getElementById('submit-btn').textContent='+ 添加主机';
+  document.getElementById('cancel-btn').style.display='none';
+  document.getElementById('pwd-hint').textContent='';
+}
+async function submitHost(){
+  const data={ip:document.getElementById('ip').value,port:parseInt(document.getElementById('port').value),
+    username:document.getElementById('username').value,password:document.getElementById('password').value,
+    description:document.getElementById('desc').value,group:document.getElementById('group').value,
+    cpu_threshold:parseInt(document.getElementById('cpu_t').value),
+    mem_threshold:parseInt(document.getElementById('mem_t').value),
+    disk_threshold:parseInt(document.getElementById('disk_t').value)};
+  if(editingId){
+    const r=await fetch('/api/hosts/'+editingId,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
+    const res=await r.json();
+    if(res.success){cancelEdit();loadHosts();}else{alert('保存失败: '+res.error);}
+  }else{
+    if(!data.ip||!data.username||!data.password){alert('请填写IP、用户名和密码');return;}
+    const r=await fetch('/api/hosts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
+    const res=await r.json();
+    if(res.success){cancelEdit();loadHosts();}else{alert('添加失败: '+res.error);}
+  }
+}
+async function delHost(id){
+  if(!confirm('确认删除？'))return;
+  await fetch('/api/hosts/'+id,{method:'DELETE'});loadHosts();
+}
+function refresh(){loadHosts();loadAlerts();loadChanges();}
+refresh();setInterval(refresh,5000);
+</script>
+</body>
+</html>

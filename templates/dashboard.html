@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>服务器实时监控大屏</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/5.4.3/echarts.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:#060b18;color:#e0e0e0;font-family:'Segoe UI',sans-serif;height:100vh;overflow:hidden;background-image:radial-gradient(ellipse at 20% 50%,rgba(30,60,120,0.15) 0%,transparent 50%),radial-gradient(ellipse at 80% 20%,rgba(20,80,120,0.1) 0%,transparent 50%);}
+.header{background:linear-gradient(90deg,#080d1a,#0d1829,#080d1a);padding:10px 24px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(79,158,255,0.2);box-shadow:0 2px 20px rgba(0,0,0,0.5);}
+.logo{display:flex;align-items:center;gap:12px;}
+.logo-icon{width:32px;height:32px;background:linear-gradient(135deg,#4f9eff,#2d6fd4);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;}
+.logo h1{font-size:17px;color:#fff;letter-spacing:2px;font-weight:600;}
+.logo h1 span{color:#4f9eff;}
+.header-right{display:flex;align-items:center;gap:24px;}
+.clock-box{text-align:right;}
+.clock-time{font-size:20px;font-weight:700;color:#4f9eff;font-family:monospace;letter-spacing:2px;}
+.clock-date{font-size:11px;color:#555;margin-top:2px;}
+.nav a{color:#666;text-decoration:none;font-size:13px;padding:6px 14px;border:1px solid #1a2744;border-radius:6px;transition:all .2s;}
+.nav a:hover{color:#4f9eff;border-color:#4f9eff;}
+.top-stats{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;padding:10px 16px;}
+.stat-card{background:linear-gradient(135deg,rgba(13,21,41,0.9),rgba(17,24,39,0.9));border:1px solid rgba(79,158,255,0.15);border-radius:10px;padding:10px 14px;position:relative;overflow:hidden;transition:all .3s;}
+.stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,#4f9eff,transparent);opacity:0.5;}
+.stat-label{font-size:10px;color:#555;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:6px;}
+.stat-value{font-size:24px;font-weight:700;color:#4f9eff;line-height:1;}
+.stat-unit{font-size:10px;color:#444;margin-top:3px;}
+.stat-card.red .stat-value{color:#ef4444;}
+.stat-card.red::before{background:linear-gradient(90deg,transparent,#ef4444,transparent);}
+.main{display:grid;grid-template-columns:190px 1fr 210px;gap:10px;padding:0 16px 10px;height:calc(100vh - 148px);}
+.panel{background:rgba(13,21,41,0.8);border:1px solid rgba(79,158,255,0.1);border-radius:12px;overflow:hidden;}
+.panel-header{padding:10px 14px;border-bottom:1px solid rgba(255,255,255,0.05);display:flex;align-items:center;gap:8px;}
+.panel-header h4{font-size:11px;color:#666;letter-spacing:1.5px;text-transform:uppercase;}
+.panel-dot{width:6px;height:6px;border-radius:50%;background:#4f9eff;box-shadow:0 0 6px #4f9eff;}
+.host-list-inner{overflow-y:auto;height:calc(100% - 40px);padding:8px;}
+.host-item{padding:10px;border-radius:8px;cursor:pointer;margin-bottom:6px;border:1px solid transparent;transition:all .2s;background:rgba(255,255,255,0.02);}
+.host-item:hover{background:rgba(79,158,255,0.08);border-color:rgba(79,158,255,0.2);}
+.host-item.active{background:rgba(79,158,255,0.1);border-color:rgba(79,158,255,0.3);}
+.host-ip{font-size:12px;font-weight:600;color:#e0e0e0;display:flex;align-items:center;gap:6px;}
+.host-desc{font-size:10px;color:#444;margin-top:2px;margin-left:14px;}
+.host-metrics{display:flex;gap:8px;margin-top:6px;margin-left:14px;}
+.hm{font-size:10px;color:#555;}
+.status-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
+.online{background:#22c55e;box-shadow:0 0 8px rgba(34,197,94,0.6);}
+.offline{background:#ef4444;}
+.center-panel{display:flex;flex-direction:column;gap:10px;}
+.gauges{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;height:180px;}
+.gauge-card{background:rgba(13,21,41,0.8);border:1px solid rgba(79,158,255,0.1);border-radius:12px;padding:10px;display:flex;flex-direction:column;}
+.gauge-title{font-size:10px;color:#555;text-align:center;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:4px;}
+.gauge-chart{flex:1;}
+.charts-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;flex:1;min-height:0;}
+.chart-card{background:rgba(13,21,41,0.8);border:1px solid rgba(79,158,255,0.1);border-radius:12px;padding:12px;display:flex;flex-direction:column;}
+.chart-title{font-size:10px;color:#555;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:6px;}
+.chart-body{flex:1;min-height:0;}
+.right-inner{overflow-y:auto;height:calc(100% - 40px);padding:8px;}
+.feed-item{padding:8px 10px;border-radius:8px;margin-bottom:6px;font-size:11px;border-left:2px solid;line-height:1.5;}
+.f-red{background:rgba(239,68,68,0.06);border-color:#ef4444;color:#fca5a5;}
+.f-yellow{background:rgba(234,179,8,0.06);border-color:#eab308;color:#fde68a;}
+.f-green{background:rgba(34,197,94,0.06);border-color:#22c55e;color:#86efac;}
+.f-gray{background:rgba(100,100,100,0.06);border-color:#555;color:#999;}
+.feed-time{font-size:10px;color:#444;margin-top:3px;}
+::-webkit-scrollbar{width:4px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:#1a2744;border-radius:2px;}
+</style>
+</head>
+<body>
+<div class="header">
+  <div class="logo">
+    <div class="logo-icon">🖥</div>
+    <h1>服务器<span>实时监控</span>大屏</h1>
+  </div>
+  <div class="header-right">
+    <nav class="nav"><a href="http://172.20.86.61:5000/"
+>← 主机管理</a ></nav>
+    <div class="clock-box">
+      <div class="clock-time" id="clock">00:00:00</div>
+      <div class="clock-date" id="clock-date"></div>
+    </div>
+  </div>
+</div>
+<div class="top-stats">
+  <div class="stat-card"><div class="stat-label">在线主机</div><div class="stat-value" id="s-online">-</div><div class="stat-unit">台在线</div></div>
+  <div class="stat-card"><div class="stat-label">平均CPU</div><div class="stat-value" id="s-cpu">-</div><div class="stat-unit">%</div></div>
+  <div class="stat-card"><div class="stat-label">平均内存</div><div class="stat-value" id="s-mem">-</div><div class="stat-unit">%</div></div>
+  <div class="stat-card"><div class="stat-label">平均磁盘</div><div class="stat-value" id="s-disk">-</div><div class="stat-unit">%</div></div>
+  <div class="stat-card"><div class="stat-label">总网速</div><div class="stat-value" id="s-net">-</div><div class="stat-unit">MB/s</div></div>
+  <div class="stat-card red"><div class="stat-label">活跃告警</div><div class="stat-value" id="s-alert">-</div><div class="stat-unit">条</div></div>
+</div>
+<div class="main">
+  <div class="panel">
+    <div class="panel-header"><div class="panel-dot"></div><h4>主机列表</h4></div>
+    <div class="host-list-inner" id="host-list"></div>
+  </div>
+  <div class="center-panel">
+    <div class="gauges">
+      <div class="gauge-card"><div class="gauge-title">CPU 使用率</div><div class="gauge-chart" id="g-cpu"></div></div>
+      <div class="gauge-card"><div class="gauge-title">内存 使用率</div><div class="gauge-chart" id="g-mem"></div></div>
+      <div class="gauge-card"><div class="gauge-title">磁盘 使用率</div><div class="gauge-chart" id="g-disk"></div></div>
+    </div>
+    <div class="charts-row">
+      <div class="chart-card"><div class="chart-title">资源趋势（近1小时）</div><div class="chart-body" id="trend-chart"></div></div>
+      <div class="chart-card"><div class="chart-title">实时网速</div><div class="chart-body" id="net-chart"></div></div>
+    </div>
+  </div>
+  <div class="panel">
+    <div class="panel-header"><div class="panel-dot" style="background:#ef4444;box-shadow:0 0 6px #ef4444"></div><h4>告警与状态</h4></div>
+    <div class="right-inner" id="alert-feed"></div>
+  </div>
+</div>
+<script>
+let gCpu,gMem,gDisk,trendChart,netChart,selectedHost=null,netHistory=[],trendHistory=[];
+function mkGauge(id,color){
+  const c=echarts.init(document.getElementById(id));
+  c.setOption({series:[{type:'gauge',radius:'92%',startAngle:210,endAngle:-30,min:0,max:100,
+    axisLine:{lineStyle:{width:10,color:[[0.6,[color,'#1a3a6b'][1]],[0.8,'#4a3000'],[1,'#4a0000']]}},
+    progress:{show:true,width:10,itemStyle:{color:color}},
+    pointer:{length:'55%',width:5,itemStyle:{color:color}},
+    axisTick:{show:false},splitLine:{show:false},
+    axisLabel:{color:'#333',fontSize:9,distance:15},
+    title:{color:'#555',fontSize:10,offsetCenter:[0,'75%']},
+    detail:{valueAnimation:true,formatter:'{value}%',color:'#e0e0e0',fontSize:18,fontWeight:700,offsetCenter:[0,'40%']},
+    data:[{value:0,name:''}]}]});
+  return c;
+}
+function mkTrend(){
+  const c=echarts.init(document.getElementById('trend-chart'));
+  c.setOption({backgroundColor:'transparent',
+    grid:{top:24,bottom:20,left:35,right:10},
+    xAxis:{type:'category',data:[],boundaryGap:false,
+      axisLine:{lineStyle:{color:'#1a2744'}},axisLabel:{color:'#444',fontSize:9}},
+    yAxis:{type:'value',min:0,max:100,
+      axisLine:{show:false},axisLabel:{color:'#444',fontSize:9},
+      splitLine:{lineStyle:{color:'rgba(255,255,255,0.04)'}}},
+    legend:{data:['CPU','内存','磁盘'],textStyle:{color:'#555',fontSize:9},top:2,right:0},
+    series:[
+      {name:'CPU',type:'line',smooth:true,data:[],symbol:'none',
+        lineStyle:{color:'#4f9eff',width:1.5},
+        areaStyle:{color:{type:'linear',x:0,y:0,x2:0,y2:1,colorStops:[{offset:0,color:'rgba(79,158,255,0.3)'},{offset:1,color:'rgba(79,158,255,0)'}]}}},
+      {name:'内存',type:'line',smooth:true,data:[],symbol:'none',
+        lineStyle:{color:'#f59e0b',width:1.5},
+        areaStyle:{color:{type:'linear',x:0,y:0,x2:0,y2:1,colorStops:[{offset:0,color:'rgba(245,158,11,0.3)'},{offset:1,color:'rgba(245,158,11,0)'}]}}},
+      {name:'磁盘',type:'line',smooth:true,data:[],symbol:'none',
+        lineStyle:{color:'#22c55e',width:1.5},
+        areaStyle:{color:{type:'linear',x:0,y:0,x2:0,y2:1,colorStops:[{offset:0,color:'rgba(34,197,94,0.3)'},{offset:1,color:'rgba(34,197,94,0)'}]}}}
+    ]});
+  return c;
+}
+function mkNet(){
+  const c=echarts.init(document.getElementById('net-chart'));
+  c.setOption({backgroundColor:'transparent',
+    grid:{top:24,bottom:20,left:40,right:10},
+    xAxis:{type:'category',data:[],boundaryGap:false,
+      axisLine:{lineStyle:{color:'#1a2744'}},axisLabel:{color:'#444',fontSize:9}},
+    yAxis:{type:'value',axisLine:{show:false},
+      axisLabel:{color:'#444',fontSize:9,formatter:'{value}M'},
+      splitLine:{lineStyle:{color:'rgba(255,255,255,0.04)'}}},
+    legend:{data:['下载','上传'],textStyle:{color:'#555',fontSize:9},top:2,right:0},
+    series:[
+      {name:'下载',type:'line',smooth:true,data:[],symbol:'none',
+        lineStyle:{color:'#4f9eff',width:1.5},
+        areaStyle:{color:{type:'linear',x:0,y:0,x2:0,y2:1,colorStops:[{offset:0,color:'rgba(79,158,255,0.25)'},{offset:1,color:'rgba(79,158,255,0)'}]}}},
+      {name:'上传',type:'line',smooth:true,data:[],symbol:'none',
+        lineStyle:{color:'#f59e0b',width:1.5},
+        areaStyle:{color:{type:'linear',x:0,y:0,x2:0,y2:1,colorStops:[{offset:0,color:'rgba(245,158,11,0.25)'},{offset:1,color:'rgba(245,158,11,0)'}]}}}
+    ]});
+  return c;
+}
+function updateGauge(chart,val){chart.setOption({series:[{data:[{value:+(val||0).toFixed(1)}]}]});}
+function pad(n){return n<10?'0'+n:n;}
+function tick(){
+  const d=new Date();
+  document.getElementById('clock').textContent=`${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  document.getElementById('clock-date').textContent=`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} 星期${'日一二三四五六'[d.getDay()]}`;
+}
+async function loadOverview(){
+  const r=await fetch('/api/overview');const d=await r.json();
+  document.getElementById('s-online').textContent=d.online+'/'+d.total;
+  document.getElementById('s-cpu').textContent=(d.metrics.avg_cpu||0).toFixed(1);
+  document.getElementById('s-mem').textContent=(d.metrics.avg_mem||0).toFixed(1);
+  document.getElementById('s-disk').textContent=(d.metrics.avg_disk||0).toFixed(1);
+  document.getElementById('s-net').textContent=((d.metrics.total_down||0)+(d.metrics.total_up||0)).toFixed(2);
+  document.getElementById('s-alert').textContent=d.alert_count||0;
+}
+async function loadHosts(){
+  const r=await fetch('/api/hosts');const hosts=await r.json();
+  const el=document.getElementById('host-list');
+  if(!hosts.length){el.innerHTML='<div style="color:#333;font-size:12px;text-align:center;padding:30px">暂无主机</div>';return;}
+  if(!selectedHost&&hosts.length)selectedHost=hosts[0].id;
+  el.innerHTML=hosts.map(h=>`<div class="host-item${h.id===selectedHost?' active':''}" onclick="selectHost(${h.id})">
+    <div class="host-ip"><span class="status-dot ${h.status==='online'?'online':'offline'}"></span>${h.ip}</div>
+    <div class="host-desc">${h.description||h.group_name||''}</div>
+    <div class="host-metrics">
+      <span class="hm">C:${(h.cpu_usage||0).toFixed(0)}%</span>
+      <span class="hm">M:${(h.mem_usage||0).toFixed(0)}%</span>
+      <span class="hm">D:${(h.disk_usage||0).toFixed(0)}%</span>
+    </div>
+  </div>`).join('');
+  const sel=hosts.find(h=>h.id===selectedHost)||hosts[0];
+  if(sel){
+    updateGauge(gCpu,sel.cpu_usage||0);
+    updateGauge(gMem,sel.mem_usage||0);
+    updateGauge(gDisk,sel.disk_usage||0);
+    const now=new Date();const t=`${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+    netHistory.push({t,down:+(sel.net_speed_down||0).toFixed(2),up:+(sel.net_speed_up||0).toFixed(2)});
+    trendHistory.push({t,cpu:+(sel.cpu_usage||0).toFixed(1),mem:+(sel.mem_usage||0).toFixed(1),disk:+(sel.disk_usage||0).toFixed(1)});
+    if(netHistory.length>20)netHistory.shift();
+    if(trendHistory.length>30)trendHistory.shift();
+    trendChart.setOption({xAxis:{data:trendHistory.map(x=>x.t)},series:[{data:trendHistory.map(x=>x.cpu)},{data:trendHistory.map(x=>x.mem)},{data:trendHistory.map(x=>x.disk)}]});
+    netChart.setOption({xAxis:{data:netHistory.map(x=>x.t)},series:[{data:netHistory.map(x=>x.down)},{data:netHistory.map(x=>x.up)}]});
+  }
+}
+async function loadAlerts(){
+  const [ar,sr]=await Promise.all([fetch('/api/alerts'),fetch('/api/status_changes')]);
+  const [alerts,changes]=await Promise.all([ar.json(),sr.json()]);
+  const feed=document.getElementById('alert-feed');
+  const items=[
+    ...alerts.slice(0,15).map(a=>{
+      const t=a.alert_type==='cpu'?'CPU':a.alert_type==='memory'?'内存':'磁盘';
+      const diff=a.current_value-a.threshold;
+      return{cls:diff>10?'f-red':'f-yellow',text:`${a.ip} ${t}使用率 ${a.current_value.toFixed(1)}% 超阈值${a.threshold}%`,time:a.created_at};
+    }),
+    ...changes.slice(0,15).map(c=>{
+      const cls=c.new_status==='online'?'f-green':c.new_status==='offline'?'f-red':'f-yellow';
+      const st=c.new_status==='online'?'上线':c.new_status==='offline'?'离线':'初始化';
+      return{cls,text:`${c.ip} 状态变为 ${st}`,time:c.changed_at};
+    })
+  ].sort((a,b)=>b.time.localeCompare(a.time)).slice(0,30);
+  feed.innerHTML=items.length?items.map(i=>`<div class="feed-item ${i.cls}">${i.text}<div class="feed-time">${i.time}</div></div>`).join(''):'<div style="color:#333;font-size:12px;text-align:center;padding:30px">暂无记录</div>';
+}
+function selectHost(id){selectedHost=id;netHistory=[];trendHistory=[];loadHosts();}
+function init(){
+  gCpu=mkGauge('g-cpu','#4f9eff');
+  gMem=mkGauge('g-mem','#f59e0b');
+  gDisk=mkGauge('g-disk','#22c55e');
+  trendChart=mkTrend();netChart=mkNet();
+  tick();setInterval(tick,1000);
+  loadOverview();loadHosts();loadAlerts();
+  setInterval(()=>{loadOverview();loadHosts();loadAlerts();},3000);
+}
+init();
+</script>
+</body>
+</html>
