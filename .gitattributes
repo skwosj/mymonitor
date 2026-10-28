@@ -1,0 +1,5 @@
+# 让 GitHub 语言统计以 Python 为主，而不是被 templates 里的 HTML 盖住
+*.html linguist-detectable=false
+*.css linguist-detectable=false
+templates/* linguist-documentation
+screenshots/* linguist-documentation
