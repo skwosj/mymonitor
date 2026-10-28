@@ -29,7 +29,7 @@
 ## 快速开始
 
 ```bash
-pip install flask paramiko apscheduler cryptography
+pip install -r requirements.txt
 python app.py
 ```
 
